@@ -1,0 +1,102 @@
+Sistemas Distribuidos 2015/16
+GRUPO 34
+Projecto 5
+
+Trabalho Realizado por:
+ * 40251	José Albuquerque
+ * 40853	António Rodrigues
+ * 41941	Rodrigo Reis
+
+INDICE
+0 	- MAKEFILE
+1	- Organizaçao das pastas
+2       - Problemas da implemetação
+3 	- Respostas as questões do enunciado
+
+
+****************
+0 - MAKEFILE
+****************
+
+A makefile desenvolvida pelo grupo 34 permite as seguintes funcionalidades:
+
+	make		Faz a buld completa do projecto
+
+	make server	Produz o executavel server que arranca com o servidor (fazendo ./server <porto> <tamanho tabela> <path_ficheiro_log>
+
+	make client	Produz o executavel client que inicia o client (fazendo ./client <id> <ip1:porto1> ... <ipn:porton>)
+	
+	make backup	Faz um backup do projecto excepto ficheiros temporarios,.pdf e .tar
+
+	make clean	Remove todos os ficheiros objecto, executáveis gerados e ficheiros temporários
+
+
+
+****************
+1 - Organização das pastas
+****************
+
+./src:
+
+	/table -> contem os ficheiros .c que dizem respeito ao modulo da tabela, isto é, data,entry,list e table.
+
+	/network -> contem os ficheiros que dizem respeito à rede:
+		/message.c - faz a serializaçao e desserializaçao das mensagens a enviar para a rede
+		/communication.c - contem as funçoes read_all e write_all para ler e escrever para os sockets.
+
+	/server -> contem os ficheiros que permitem o servidor funcionar:
+		/table_server.c contem a funçao main para arrancar o servidor.
+		/tabel_skel.c -implementa uma chamada RPC, isto serve de interface para comunicação 	entre o servidor e a tabela.
+
+	/persistence -> contem os ficheiros que implementam um tabela persistente no disco
+		/persistent_table.c - implementa um tabela de persistencia, isto é, faz as operaçoes na tabela e ao mesmo tempo guarda-as num ficheiro.
+		persistence_manager.c - modulo usado para fazer persistir as operçoes de escrita da tabela num ficheiro em disco. Tem as funçoes para escrita e leitura do ficheiro.
+
+	/client -> contem o codigo que permite por o cliente a comunicar com o servidor:
+		/network_client.c -cria a ligação ao servidor e encapsula a funçao para enviar e receber dados.
+		/table_client - contem a funçao main do servidor que permite interaçao com o utilizador.
+		/client_stub - implementa o RPC. concretiza todas as funçoes que possibilitem todas as operaçoes que podem ser executadas na tabela.
+
+	/quorum -> contem os ficheiros que tratam do quorum
+		/quorum_table.c -> funciona com um stub para ligaçao ao quorum access e gere o quorum fazendo writeBacks
+		/quorum_access.c -> Cria as varia threads de ligação aos servidores e geres os pedidos a estes através de filas 
+
+./obj:
+	Pasta para onde vão parar todos os ficheiros object após compilação.
+
+./inc:
+	Contem todos os ficheiros.h onde estão os cabecalhos das funçoes de cada modulo.
+
+****************
+2 -Problemas da implemetação
+****************
+O maior problema a implementar este projecto 5 foi no refazer do quorum quando um servidor vai a baixo. Como detectar que um servidor falha? Como o network_send_receive fica 
+"eternamente" a tentar reconnect não conseguimos prever o crash do servidor. Para ultrapassar esta dificuldade implementámos um sistema de timeout na fila de espera da 
+thread principal. Ao fim de x tempo o conditional mutex é libertado e a fila retorna null. A partir daqui tentámos fazer a ligação aos outros servidores do sistema até obter
+as respostas expectaveis.    
+
+****************
+3 - Interpretação do enunciado
+****************
+Como concretizar a função size? Em que condições a concretização proposta funciona?
+
+A nossa opção foi criar uma função que obtem o número de operações da tabela. Registamos o servidor que contem o maior número de operaçoes,(significa que é o mais atualizado 
+no momento) e retornamos ao cliente o valor size deste servidor. Caso este entretanto fique inativo, devolvemos a média dos sizes entre todos os servidores contactados. 
+Esta implementação pode  não devolver o valor correcto se por exemplo o servidor mais atual não pertencer naquele momento ao quorum de servidores.
+   
+
+Como concretizar a função getkeys? Em que condições a concretização proposta funciona?
+
+A concretização desta operação foi similar à função size. Primeiro obtemos o numero de operações feita em todos os servidores do quorum e 
+devolvemos as chaves do servidor com maior numero de operaçoes.
+
+Como limpar as chaves a NULL dos servidores (implementar garbage collection)? Emque condições a concretização proposta funciona?
+
+Não implementámos esta função. Mas pensamos que para o sistema ficar coerente a limpeza das chaves só deve ser feita quando tivermos a certeza que a chave está a null em
+todos os servidores ou não existe. 
+
+Como responder ao cliente quando não se conseguiu resposta do quórum de k servidores? Em que condições a implementação funciona e que impacto tem na
+consistência da tabela de quorum?
+
+Quando não conseguimos formar um quorum de servidores retornamos -1 ao cliente. Nas nosso óptica simboliza uma mensagem de erro a avisar que o sistema está em baixo. 
+
